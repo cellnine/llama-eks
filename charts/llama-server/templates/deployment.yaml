@@ -1,0 +1,122 @@
+{{- if .Values.serviceAccount.roleArn -}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.serviceAccount.name }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    eks.amazonaws.com/role-arn: {{ .Values.serviceAccount.roleArn }}
+{{- end }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "llama-server.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "llama-server.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  strategy:
+    RollingUpdate:
+      maxSurge: 0
+      maxUnavailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "llama-server.name" . }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "llama-server.labels" . | nindent 8 }}
+    spec:
+      {{- if .Values.serviceAccount.roleArn }}
+      serviceAccountName: {{ .Values.serviceAccount.name }}
+      {{- end }}
+      securityContext:
+        fsGroup: {{ .Values.containerSecurityContext.fsGroup }}
+      initContainers:
+        - name: fetch-model
+          image: {{ .Values.initImage }}
+          securityContext:
+            runAsUser: {{ .Values.runAsUser | default 1000 }}
+            runAsGroup: {{ .Values.runAsGroup | default 1000 }}
+          env:
+            - name: AWS_DEFAULT_REGION
+              value: {{ .Values.awsRegion }}
+            - name: AWS_PAGER
+              value: ""
+          command: ["/bin/sh", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              echo "Copying s3://{{ .Values.model.bucket }}/{{ .Values.model.key }} to /models/"
+              aws s3 cp "s3://{{ .Values.model.bucket }}/{{ .Values.model.key }}" {{ include "llama-server.modelPath" . }} --no-progress
+              echo "Done."
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      containers:
+        - name: llama-server
+          image: {{ .Values.image.repository }}:{{ .Values.image.tag }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          securityContext:
+            runAsUser: {{ .Values.containerSecurityContext.runAsUser }}
+            runAsGroup: {{ .Values.containerSecurityContext.runAsGroup }}
+          args:
+            - -m
+            - {{ include "llama-server.modelPath" . }}
+            - --port
+            - {{ .Values.llamaArgs.port | quote }}
+            - --host
+            - 0.0.0.0
+            - --threads
+            - {{ .Values.resources.limits.cpu | quote }}
+            - --ctx-size
+            - {{ .Values.llamaArgs.contextSize | quote }}
+            - --parallel
+            - {{ .Values.llamaArgs.parallel | quote }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.llamaArgs.port }}
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.llamaArgs.port }}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            failureThreshold: 120
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.llamaArgs.port }}
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            failureThreshold: 10
+          startupProbe:
+            httpGet:
+              path: /health
+              port: {{ .Values.llamaArgs.port }}
+            periodSeconds: 5
+            failureThreshold: 60
+          resources:
+            {{- with .Values.resources }}
+            requests:
+              cpu: {{ .requests.cpu }}
+              memory: {{ .requests.memory }}
+            limits:
+              cpu: {{ .limits.cpu }}
+              memory: {{ .limits.memory }}
+            {{- end }}
+          volumeMounts:
+            - name: models
+              mountPath: /models
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
+      volumes:
+        - name: models
+          emptyDir: {}

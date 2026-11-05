@@ -1,0 +1,64 @@
+# Default values for llama-server.
+
+replicaCount: 2
+
+image:
+  repository: ghcr.io/ggml-org/llama.cpp
+  tag: server
+  pullPolicy: IfNotPresent
+
+initImage: amazon/aws-cli
+
+awsRegion: us-east-1
+
+model:
+  # S3 bucket/name of the GGUF; object must exist at deploy time.
+  bucket: llama-eks-model
+  key: qwen2.5-1.5b-instruct-q4_k_m.gguf
+
+llamaArgs:
+  port: 8080
+  contextSize: 4096
+  parallel: 1
+
+resources:
+  requests:
+    cpu: 4
+    memory: 3Gi
+  limits:
+    cpu: 4
+    memory: 3Gi
+
+# Pass the IRSA role ARN via `--set serviceAccount.roleArn=...`
+serviceAccount:
+  name: llama-server
+  roleArn: ""
+
+service:
+  type: ClusterIP
+  port: 80
+
+# Schedule onto Karpenter-managed nodes with the inference taint.
+nodeSelector:
+  nodepool: llama-inference
+
+tolerations:
+  - key: inference
+    operator: Equal
+    value: "true"
+    effect: NoSchedule
+
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: kubernetes.io/hostname
+    whenUnsatisfiable: ScheduleAnyway
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: llama-server
+
+podSecurityContext: {}
+
+containerSecurityContext:
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000

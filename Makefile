@@ -43,8 +43,28 @@ validate:
 kubeconfig: ## Update local kubeconfig for the EKS cluster
 	aws eks update-kubeconfig --region $(REGION) --name $(CLUSTER)
 
-model-upload: ## Upload the GGUF to the model bucket (run after `aws configure set region us-east-1`)
-	aws s3 cp loadtest/model.gguf s3://$(PROJECT)-model/qwen2.5-1.5b-instruct-q4_k_m.gguf --no-progress
+model-upload: ## Upload the GGUF to the model bucket (needs the bucket to exist first)
+	aws s3 cp loadtest/qwen2.5-1.5b-instruct-q4_k_m.gguf s3://$(PROJECT)-model/qwen2.5-1.5b-instruct-q4_k_m.gguf --region $(REGION) --no-progress
 
 output: ## Show terraform outputs
 	terraform -chdir=terraform output
+
+# Day 2+: deploy the llama-server release.
+NAMESPACE ?= llama
+MODEL_BUCKET ?= $(PROJECT)-model
+MODEL_KEY ?= qwen2.5-1.5b-instruct-q4_k_m.gguf
+LLAMA_ROLE_ARN := $(shell terraform -chdir=terraform output -raw llama_s3_reader_role_arn 2>/dev/null)
+
+up: kubeconfig ## Deploy llama-server: Hive chart + init container pulls model from S3
+	helm upgrade --install llama-server charts/llama-server \
+		--namespace $(NAMESPACE) --create-namespace \
+		--set model.bucket=$(MODEL_BUCKET) \
+		--set model.key=$(MODEL_KEY) \
+		--set serviceAccount.roleArn=$(LLAMA_ROLE_ARN) \
+		--wait --timeout 20m
+
+port-forward: ## Forward the llama-server service to localhost:8080
+	kubectl -n $(NAMESPACE) port-forward svc/llama-server 8080:80
+
+charge: ## Remove the llama-server release
+	helm del llama-server --namespace $(NAMESPACE)

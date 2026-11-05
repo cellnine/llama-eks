@@ -28,3 +28,7 @@ loadtest/results/
 # Go
 gateway/llama-eks-gateway
 gateway/gateway
+
+# Model artifacts
+loadtest/.cache/
+*.gguf
