@@ -58,7 +58,7 @@ resource "kubectl_manifest" "spot_node_pool" {
               values: [c7i]
             - key: karpenter.k8s.aws/instance-size
               operator: In
-              values: [2xlarge]
+              values: [xlarge, 2xlarge]
             - key: karpenter.sh/capacity-type
               operator: In
               values: [spot]
@@ -103,7 +103,7 @@ resource "kubectl_manifest" "ondemand_node_pool" {
               values: [c7i]
             - key: karpenter.k8s.aws/instance-size
               operator: In
-              values: [2xlarge]
+              values: [xlarge, 2xlarge]
             - key: karpenter.sh/capacity-type
               operator: In
               values: [on-demand]
