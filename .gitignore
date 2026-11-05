@@ -1,0 +1,30 @@
+# Terraform
+.terraform/
+.terraform.lock.hcl
+terraform.tfstate*
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+.tfplan
+
+# Local env / secrets
+.env
+*.pem
+kubeconfig*
+*.kubeconfig
+
+# K6
+loadtest/results/
+*.out
+
+# Editor
+.idea/
+.vscode/
+.DS_Store
+
+# Go
+gateway/llama-eks-gateway
+gateway/gateway
