@@ -1,0 +1,49 @@
+# Default values for gateway.
+
+replicaCount: 2
+
+image:
+  # 438776351319.dkr.ecr.us-east-1.amazonaws.com/llama-eks-gateway
+  repository: ""
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+# API keys, one hashed key per line ("name:<sha256hex>" or bare "<sha256hex>").
+# Generate a digest for a new raw token with:
+#   printf 'your-raw-token' | shasum -a 256 | cut -d' ' -f1
+keys:
+  - "main:PUT-THE-SHA256-DIGEST-OF-YOUR-KEY-HERE"
+
+upstream: "http://llama-server.llama.svc.cluster.local:80"
+
+config:
+  rateRPS: 1        # per-key requests/sec
+  rateBurst: 4
+  inflightMax: 4    # concurrent upstream requests per gateway replica
+  queueWaitMs: 2000
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 256Mi
+
+ingress:
+  enabled: true
+  className: alb
+  # ACM certificate ARN for the ALB HTTPS listener (required for :443)
+  sslCertArn: ""
+  # hostname used as the Ingress host rule; leave "" to match any host
+  hostname: ""
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: "ip"
+    alb.ingress.kubernetes.io/healthcheck-path: /healthz
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/ssl-redirect: "443"

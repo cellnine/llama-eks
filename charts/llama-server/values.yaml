@@ -62,3 +62,10 @@ containerSecurityContext:
   runAsUser: 1000
   runAsGroup: 1000
   fsGroup: 1000
+
+# Egress only from the gateway namespace into llama-server.
+# Requires a CNI enforcing NetworkPolicies (EKS VPC CNI v1.15+ with `ENABLE_NETWORK_POLICY`).
+networkPolicy:
+  enabled: true
+  gatewayNamespace: gateway
+
