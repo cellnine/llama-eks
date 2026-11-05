@@ -1,12 +1,12 @@
 SHELL := /bin/bash
 REGION      ?= us-east-1
 CLUSTER     ?= llama-eks
-ACCOUNT_ID  := $(shell aws sts get-caller-identity --query Account --output text 2>/dev/null)
 PROJECT     ?= llama-eks
+ACCOUNT_ID  := $(shell aws sts get-caller-identity --query Account --output text 2>/dev/null)
 STATE_BUCKET ?= $(PROJECT)-tfstate-$(ACCOUNT_ID)
 LOCK_TABLE  ?= $(PROJECT)-tf-locks
 
-# Backend config shared by init/bootstrap.
+# Terraform state, resolved at init time instead of hardcoding an account id here.
 BACKEND_ARGS := \
 	-backend-config="bucket=$(STATE_BUCKET)" \
 	-backend-config="key=$(PROJECT)/terraform.tfstate" \
@@ -14,9 +14,10 @@ BACKEND_ARGS := \
 	-backend-config="dynamodb_table=$(LOCK_TABLE)" \
 	-backend-config="encrypt=true"
 
-.PHONY: bootstrap plan apply fmt fmt-check validate destroy kubeconfig model-upload output repos
+.PHONY: bootstrap init plan apply destroy fmt fmt-check validate kubeconfig model-upload output \
+        up down port-forward up-gateway up-all monitoring load bench help
 
-bootstrap: ## Create S3 state bucket + DynamoDB lock table (run once per account)
+bootstrap: ## One-time: S3 state bucket + DynamoDB lock table (needs AWS creds)
 	./scripts/bootstrap-backend.sh "$(STATE_BUCKET)" "$(LOCK_TABLE)" "$(REGION)"
 
 init:
@@ -25,7 +26,7 @@ init:
 plan: init ## Terraform plan
 	terraform -chdir=terraform plan $(TF_ARGS)
 
-apply: init ## Terraform apply (interactive)
+apply: ## Terraform apply (interactive)
 	terraform -chdir=terraform apply $(TF_ARGS)
 
 destroy: ## Tear down terraform-managed infra
@@ -43,19 +44,21 @@ validate:
 kubeconfig: ## Update local kubeconfig for the EKS cluster
 	aws eks update-kubeconfig --region $(REGION) --name $(CLUSTER)
 
-model-upload: ## Upload the GGUF to the model bucket (needs the bucket to exist first)
-	aws s3 cp loadtest/qwen2.5-1.5b-instruct-q4_k_m.gguf s3://$(PROJECT)-model/qwen2.5-1.5b-instruct-q4_k_m.gguf --region $(REGION) --no-progress
+model-upload: ## Upload the GGUF to the model bucket (needs the bucket from apply to exist)
+	aws s3 cp loadtest/qwen2.5-1.5b-instruct-q4_k_m.gguf \
+		s3://$(PROJECT)-model/qwen2.5-1.5b-instruct-q4_k_m.gguf --region $(REGION) --no-progress
 
 output: ## Show terraform outputs
 	terraform -chdir=terraform output
 
-# Day 2+: deploy the llama-server release.
-NAMESPACE ?= llama
-MODEL_BUCKET ?= $(PROJECT)-model
-MODEL_KEY ?= qwen2.5-1.5b-instruct-q4_k_m.gguf
+# ---- Day 2: llama-server ---------------------------------------------------
+
+NAMESPACE     ?= llama
+MODEL_BUCKET  ?= $(PROJECT)-model
+MODEL_KEY     ?= qwen2.5-1.5b-instruct-q4_k_m.gguf
 LLAMA_ROLE_ARN := $(shell terraform -chdir=terraform output -raw llama_s3_reader_role_arn 2>/dev/null)
 
-up: kubeconfig ## Deploy llama-server: Hive chart + init container pulls model from S3
+up: kubeconfig ## Deploy llama-server (init container pulls the model from S3)
 	helm upgrade --install llama-server charts/llama-server \
 		--namespace $(NAMESPACE) --create-namespace \
 		--set model.bucket=$(MODEL_BUCKET) \
@@ -63,8 +66,49 @@ up: kubeconfig ## Deploy llama-server: Hive chart + init container pulls model f
 		--set serviceAccount.roleArn=$(LLAMA_ROLE_ARN) \
 		--wait --timeout 20m
 
-port-forward: ## Forward the llama-server service to localhost:8080
+port-forward: ## Forward llama-server to localhost:8080 for a direct curl test
 	kubectl -n $(NAMESPACE) port-forward svc/llama-server 8080:80
 
-charge: ## Remove the llama-server release
-	helm del llama-server --namespace $(NAMESPACE)
+down: ## Remove the llama-server release
+	helm del llama-server --namespace $(NAMESPACE) --wait || true
+
+# ---- Day 3/4: gateway, ALB, observability ----------------------------------
+
+GATENAMESPACE ?= gateway
+GATEWAY_REPO  := $(shell terraform -chdir=terraform output -raw gateway_ecr_repository_url 2>/dev/null)
+GATEWAY_TAG   ?= latest
+GATEWAY_KEY   ?= demo-key-1
+GATEWAY_HOSTNAME ?=
+
+up-gateway: kubeconfig ## Deploy the gateway behind the ALB (hashed key from $(GATEWAY_KEY))
+	@KEY_HASH=$$(printf '%s' '$(GATEWAY_KEY)' | shasum -a 256 | cut -d' ' -f1); \
+	helm upgrade --install gateway charts/gateway \
+		--namespace $(GATENAMESPACE) --create-namespace \
+		--set image.repository=$(GATEWAY_REPO) \
+		--set image.tag=$(GATEWAY_TAG) \
+		--set keys="main:$$KEY_HASH" \
+		--set ingress.hostname=$(GATEWAY_HOSTNAME) \
+		--set serviceMonitor.enabled=true \
+		--wait --timeout 10m
+
+up-all: kubeconfig monitoring up up-gateway ## llama-server + prometheus/keda + gateway
+
+monitoring: ## Apply observability/autoscaling terraform (kube-prometheus-stack, KEDA, ScaledObject)
+	terraform -chdir=terraform apply -auto-approve -input=false
+
+# ---- Day 4: benchmark ------------------------------------------------------
+
+GW_BASE      ?= http://localhost:8080
+API_KEY      ?= $(GATEWAY_KEY)
+PER_TEST_SEC ?= 60
+MAX_TOKENS   ?= 64
+
+load: ## One k6 run at CONCURRENCY (default 1)
+	CONCURRENCY=$(CONCURRENCY) GW_BASE=$(GW_BASE) API_KEY='$(API_KEY)' \
+	PER_TEST_SEC=$(PER_TEST_SEC) MAX_TOKENS=$(MAX_TOKENS) k6 run loadtest/load.js
+
+bench: ## Full sweep 1,2,4,8,16 concurrency, results in loadtest/results/
+	loadtest/bench.sh
+
+help:
+	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*? "}; {printf "\033[36m%-14s\033[0m %s\n", $$1, $$2}'

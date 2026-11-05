@@ -47,3 +47,8 @@ ingress:
     alb.ingress.kubernetes.io/healthcheck-path: /healthz
     alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
     alb.ingress.kubernetes.io/ssl-redirect: "443"
+
+# Prometheus scrape (Day 4) — flip in `make up` once kube-prometheus-stack is up.
+serviceMonitor:
+  enabled: false
+  additionalLabels: {}
