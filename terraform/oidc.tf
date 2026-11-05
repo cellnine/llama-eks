@@ -26,7 +26,7 @@ resource "aws_iam_role" "github_terraform" {
             "${local.oidc_federation_base}:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "${local.oidc_federation_base}:sub" = "repo:${var.github_repo}:*"
+            "${local.oidc_federation_base}:sub" = "repo:cellnine@89855954/llama-eks@1447447468:*"
           }
         }
       }
@@ -61,7 +61,7 @@ resource "aws_iam_role" "github_ecr_push" {
             "${local.oidc_federation_base}:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "${local.oidc_federation_base}:sub" = "repo:${var.github_repo}:*"
+            "${local.oidc_federation_base}:sub" = "repo:cellnine@89855954/llama-eks@1447447468:*"
           }
         }
       }
