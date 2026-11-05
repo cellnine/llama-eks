@@ -28,8 +28,7 @@ module "llama_s3_reader_role" {
   source  = "terraform-aws-modules/iam/aws//modules/iam-role-for-service-accounts-eks"
   version = "~> 5.60"
 
-  role_name  = "${var.project}-llama-server-s3-reader"
-  role_tags  = { Project = var.project }
+  role_name = "${var.project}-llama-server-s3-reader"
   role_policy_arns = merge(
     { model-read = aws_iam_policy.llama_model_read.arn },
   )

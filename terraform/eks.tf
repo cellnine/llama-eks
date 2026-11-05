@@ -9,12 +9,12 @@ module "eks" {
   subnet_ids               = module.vpc.private_subnets
   control_plane_subnet_ids = module.vpc.private_subnets
 
-  cluster_endpoint_public_access = true
+  endpoint_public_access = true
 
   enable_irsa = true
 
   # Pod Identity agent (Karpenter controller auth) needs this addon
-  cluster_addons = {
+  addons = {
     "eks-pod-identity-agent" = {}
   }
 
