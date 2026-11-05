@@ -23,9 +23,9 @@ variable "github_repo" {
 }
 
 variable "system_node_instance_types" {
-  description = "Instance types for the on-demand system node group"
+  description = "Instance types for the on-demand system node group. t3 keeps system pods in their own vCPU bucket so the full Standard bucket stays free for c7i inference nodes."
   type        = list(string)
-  default     = ["m5.large"]
+  default     = ["t3.medium"]
 }
 
 variable "system_node_min_size" {
@@ -35,10 +35,10 @@ variable "system_node_min_size" {
 
 variable "system_node_max_size" {
   type    = number
-  default = 2
+  default = 1
 }
 
 variable "system_node_desired_size" {
   type    = number
-  default = 2
+  default = 1
 }

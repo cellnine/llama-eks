@@ -53,10 +53,10 @@ resource "kubectl_manifest" "spot_node_pool" {
               value: "true"
               effect: NoSchedule
           requirements:
-            - key: karpenter.k8s.io/instance-family
+            - key: karpenter.k8s.aws/instance-family
               operator: In
               values: [c7i]
-            - key: karpenter.k8s.io/instance-size
+            - key: karpenter.k8s.aws/instance-size
               operator: In
               values: [2xlarge]
             - key: karpenter.sh/capacity-type
@@ -98,10 +98,10 @@ resource "kubectl_manifest" "ondemand_node_pool" {
               value: "true"
               effect: NoSchedule
           requirements:
-            - key: karpenter.k8s.io/instance-family
+            - key: karpenter.k8s.aws/instance-family
               operator: In
               values: [c7i]
-            - key: karpenter.k8s.io/instance-size
+            - key: karpenter.k8s.aws/instance-size
               operator: In
               values: [2xlarge]
             - key: karpenter.sh/capacity-type

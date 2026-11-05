@@ -1,3 +1,22 @@
+locals {
+  account_id = data.aws_caller_identity.current.account_id
+}
+
+# Root principal as cluster admin (EKS API access mode requires an explicit entry).
+resource "aws_eks_access_entry" "admin" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = "arn:aws:iam::${local.account_id}:root"
+}
+
+resource "aws_eks_access_policy_association" "admin" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = aws_eks_access_entry.admin.principal_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  access_scope {
+    type = "cluster"
+  }
+}
+
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 21.29"
@@ -13,9 +32,18 @@ module "eks" {
 
   enable_irsa = true
 
-  # Pod Identity agent (Karpenter controller auth) needs this addon
+  # Core EKS add-ons (NOT installed by default by the module) + Pod Identity agent.
+  # NetworkPolicy enforcement rides on the VPC-CNI day 3 requirement.
   addons = {
-    "eks-pod-identity-agent" = {}
+    coredns    = { most_recent = true }
+    kube-proxy = { most_recent = true }
+    vpc-cni = {
+      most_recent = true
+      configuration_values = jsonencode({
+        enableNetworkPolicy = true
+      })
+    }
+    eks-pod-identity-agent = {}
   }
 
   eks_managed_node_groups = {
