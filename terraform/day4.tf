@@ -49,34 +49,3 @@ resource "helm_release" "keda" {
 locals {
   prometheus_url = "http://${helm_release.kube_prometheus_stack.name}-prometheus.monitoring.svc.cluster.local:9090"
 }
-
-resource "kubectl_manifest" "keda_scaled_object" {
-  yaml_body = <<-YAML
-    apiVersion: keda.sh/v1alpha1
-    kind: ScaledObject
-    metadata:
-      name: llama-server
-      namespace: llama
-    spec:
-      scaleTargetRef:
-        kind: Deployment
-        name: llama-server
-      minReplicaCount: 2
-      maxReplicaCount: 8
-      cooldownPeriod: 180
-      pollingInterval: 15
-      triggers:
-        - type: prometheus
-          metadata:
-            serverAddress: ${local.prometheus_url}
-            # Cluster-wide in-flight count. Each gateway replica caps at
-            # INFLIGHT_MAX so with 2 gateway replicas a threshold of 4
-            # corresponds to ~2 in-flight requests per llama.cpp replica.
-            query: sum(gateway_inflight)
-            # Avg across pods; gateway caps at INFLIGHT_MAX=4 per replica, so a
-            # saturated fleet of 4 llama pods shows sum ~8 -> avg 4 -> 2x scale.
-            threshold: "2"
-  YAML
-
-  depends_on = [helm_release.keda, helm_release.kube_prometheus_stack]
-}

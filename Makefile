@@ -101,8 +101,9 @@ up-gateway: kubeconfig ## Deploy the gateway behind the ALB (hashed key from $(G
 
 up-all: kubeconfig monitoring up up-gateway ## llama-server + prometheus/keda + gateway
 
-monitoring: ## Apply observability/autoscaling terraform (kube-prometheus-stack, KEDA, ScaledObject)
+monitoring: ## Apply observability/autoscaling terraform (kube-prometheus-stack, KEDA) + ScaledObject
 	terraform -chdir=terraform apply -auto-approve -input=false
+	kubectl apply -f k8s/scaledobject.yaml
 
 # ---- Day 4: benchmark ------------------------------------------------------
 

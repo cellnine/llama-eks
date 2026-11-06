@@ -1,0 +1,21 @@
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: llama-server
+  namespace: llama
+spec:
+  scaleTargetRef:
+    kind: Deployment
+    name: llama-server
+  minReplicaCount: 2
+  maxReplicaCount: 8
+  cooldownPeriod: 180
+  pollingInterval: 15
+  triggers:
+    - type: prometheus
+      metadata:
+        serverAddress: http://kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090
+        # Avg across pods; gateway caps at INFLIGHT_MAX=4 per replica, so a
+        # saturated fleet of 4 llama pods shows sum ~8 -> avg 4 -> 2x scale.
+        query: sum(gateway_inflight)
+        threshold: "2"
