@@ -17,6 +17,21 @@ resource "aws_eks_access_policy_association" "admin" {
   }
 }
 
+# CI applies kubectl_manifests/helm releases against the cluster as the terraform role.
+resource "aws_eks_access_entry" "ci" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = aws_iam_role.github_terraform.arn
+}
+
+resource "aws_eks_access_policy_association" "ci" {
+  cluster_name  = module.eks.cluster_name
+  principal_arn = aws_eks_access_entry.ci.principal_arn
+  policy_arn    = "arn:aws:eks::aws:cluster-access-policy/AmazonEKSClusterAdminPolicy"
+  access_scope {
+    type = "cluster"
+  }
+}
+
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
   version = "~> 21.29"
