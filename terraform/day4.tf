@@ -73,7 +73,9 @@ resource "kubectl_manifest" "keda_scaled_object" {
             # INFLIGHT_MAX so with 2 gateway replicas a threshold of 4
             # corresponds to ~2 in-flight requests per llama.cpp replica.
             query: sum(gateway_inflight)
-            threshold: "4"
+            # Avg across pods; gateway caps at INFLIGHT_MAX=4 per replica, so a
+            # saturated fleet of 4 llama pods shows sum ~8 -> avg 4 -> 2x scale.
+            threshold: "2"
   YAML
 
   depends_on = [helm_release.keda, helm_release.kube_prometheus_stack]
