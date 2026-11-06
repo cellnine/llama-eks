@@ -43,6 +43,8 @@ spec:
             runAsUser: {{ .Values.runAsUser | default 1000 }}
             runAsGroup: {{ .Values.runAsGroup | default 1000 }}
           env:
+            - name: HOME
+              value: /tmp
             - name: AWS_DEFAULT_REGION
               value: {{ .Values.awsRegion }}
             - name: AWS_PAGER
@@ -52,7 +54,7 @@ spec:
             - |
               set -euo pipefail
               echo "Copying s3://{{ .Values.model.bucket }}/{{ .Values.model.key }} to /models/"
-              aws s3 cp "s3://{{ .Values.model.bucket }}/{{ .Values.model.key }}" {{ include "llama-server.modelPath" . }} --no-progress
+              aws s3 cp "s3://{{ .Values.model.bucket }}/{{ .Values.model.key }}" /models/ --no-progress
               echo "Done."
           volumeMounts:
             - name: models

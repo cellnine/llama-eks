@@ -13,6 +13,7 @@ app.kubernetes.io/version: {{ .Values.image.tag | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 {{- end -}}
 
-{{- define "llama-server.modelPath" -}}
+{{-
+    define "llama-server.modelPath" -}}
 {{- printf "/models/%s" .Values.model.key -}}
 {{- end -}}
