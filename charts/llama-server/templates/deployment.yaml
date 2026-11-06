@@ -18,7 +18,8 @@ metadata:
 spec:
   replicas: {{ .Values.replicaCount }}
   strategy:
-    RollingUpdate:
+    type: RollingUpdate
+    rollingUpdate:
       maxSurge: 0
       maxUnavailable: 1
   selector:

@@ -127,7 +127,7 @@ resource "kubectl_manifest" "ondemand_node_pool" {
 
 resource "kubectl_manifest" "ec2_node_class" {
   yaml_body = <<-YAML
-    apiVersion: karpenter.sh/v1
+    apiVersion: karpenter.k8s.aws/v1
     kind: EC2NodeClass
     metadata:
       name: llama-inference

@@ -35,15 +35,16 @@ module "eks" {
   # Core EKS add-ons (NOT installed by default by the module) + Pod Identity agent.
   # NetworkPolicy enforcement rides on the VPC-CNI day 3 requirement.
   addons = {
-    coredns    = { most_recent = true }
-    kube-proxy = { most_recent = true }
+    coredns    = { most_recent = true, before_compute = true }
+    kube-proxy = { most_recent = true, before_compute = true }
     vpc-cni = {
-      most_recent = true
+      most_recent    = true
+      before_compute = true
       configuration_values = jsonencode({
-        enableNetworkPolicy = true
+        enableNetworkPolicy = "true"
       })
     }
-    eks-pod-identity-agent = {}
+    eks-pod-identity-agent = { before_compute = true }
   }
 
   eks_managed_node_groups = {
