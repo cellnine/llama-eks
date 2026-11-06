@@ -104,7 +104,10 @@ make destroy
 ```
 
 Then eyeball the console that NAT gateway and ALB are gone — those two are what actually
-bill while everything sleeps.
+bill while everything sleeps. Verified clean on 2026-11-06: zero running instances, zero
+load balancers, zero NAT gateways, control plane plus IAM roles/ECR/model bucket deleted,
+orphan Spot-pod ENIs handled. State bucket and lock table intentionally kept (free tier)
+so the next `make apply` picks up with a warm state.
 
 CI runs on GitHub Actions with OIDC only (no static keys): `terraform plan` on PRs,
 apply on merge, gateway image builds and pushes to ECR.
