@@ -37,18 +37,7 @@ than inference optimization at this point.
 
 ## Architecture
 
-```mermaid
-flowchart TD
-  U[client] -- HTTP --> LB["ALB (public)"]
-  LB --> GW["Go gateway<br/>api keys · rate limit · inflight cap"]
-  GW --> SVC["llama-server Service<br/>ClusterIP"]
-  SVC --> P1["llama.cpp pod 1<br/>model from S3 (IRSA)"]
-  SVC --> P2["llama.cpp pod 2"]
-  P1 & P2 --> N1["c7i Spot — Karpenter node pool"]
-  GW -. scrape .-> PROM["Prometheus"]
-  PROM --> KEDA -. HPA 2..8 .-> SVC
-  KEDA -. pending pod .-> NP["Karpenter NodePool<br/>Spot, on-demand fallback"]
-```
+![Architecture](docs/img/architecture.png)
 
 
 Details worth mentioning:
