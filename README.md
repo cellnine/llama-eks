@@ -6,7 +6,6 @@ Qwen2.5 1.5B stored in S3 and pulled into the pod at boot, and a ~400-line Go ga
 (API keys, rate limiting, in-flight cap, streaming) in front of it.
 One command brings it up, another tears it all down.
 
-![Grafana — the load-test spike](docs/img/dashboard.png)
 
 The top row is a live load test: KEDA flagged in-flight requests above its threshold,
 scaled llama.cpp from 2 pods to 3, Karpenter provisioned a c7i.2xlarge Spot node for the
@@ -38,16 +37,19 @@ than inference optimization at this point.
 
 ## Architecture
 
+```mermaid
+flowchart TD
+  U[client] -- HTTP --> LB["ALB (public)"]
+  LB --> GW["Go gateway<br/>api keys · rate limit · inflight cap"]
+  GW --> SVC["llama-server Service<br/>ClusterIP"]
+  SVC --> P1["llama.cpp pod 1<br/>model from S3 (IRSA)"]
+  SVC --> P2["llama.cpp pod 2"]
+  P1 & P2 --> N1["c7i Spot — Karpenter node pool"]
+  GW -. scrape .-> PROM["Prometheus"]
+  PROM --> KEDA -. HPA 2..8 .-> SVC
+  KEDA -. pending pod .-> NP["Karpenter NodePool<br/>Spot, on-demand fallback"]
 ```
-            ┌────────────────────── public ─────────────────────┐
- client ──► ALB ──► Go gateway ──► llama-server Service (ClusterIP)
-                     │                    │
-                     │                    └── pods on 2× c7i.xlarge (on-demand)
-                     │                        + c7i Spot nodes as load demands
-                     │
-                     └─► Prometheus ──► KEDA ──► HPA (llama-server 2..8 pods)
-                                                └── pending pod ──► Karpenter NodeClaim
-```
+
 
 Details worth mentioning:
 
@@ -102,27 +104,7 @@ make destroy
 ```
 
 Then eyeball the console that NAT gateway and ALB are gone — those two are what actually
-bill while everything sleeps. That's the one box still unticked from the plan's
-definition-of-done; everything else shipped.
-
-## Things that bit during the build
-
-Kept short because they're all documented with fixes in USAGE.md, but these cost the most
-time and are exactly what someone else will hit again:
-
-- EKS `API_AND_CONFIG_MAP` mode requires an explicit access entry for your principal —
-  every request 401s until one exists, even for the account root.
-- The EKS terraform module installs no add-ons by default. CNI/CoreDNS/kube-proxy missing
-  shows up as nodes that register but stay `NotReady`, and node groups that sit in
-  `CREATING` forever. Set `before_compute = true` on the add-ons so CNI lands first.
-- First Spot launch on a fresh account fails with
-  `ServiceLinkedRoleCreationNotPermitted` until you create the EC2 Spot SLR by hand.
-- Karpenter v1 splits the label namespaces: NodePools live in `karpenter.sh/v1`,
-  EC2NodeClass in `karpenter.k8s.aws/v1`, and requirement keys use
-  `karpenter.k8s.aws/instance-family`.
-- GitHub OIDC from a personal account issues `sub` as
-  `repo:<login>@<uid>/<repo>@<rid>:ref:...` — the usual `repo:owner/repo` trust policies
-  don't match.
+bill while everything sleeps.
 
 CI runs on GitHub Actions with OIDC only (no static keys): `terraform plan` on PRs,
 apply on merge, gateway image builds and pushes to ECR.
