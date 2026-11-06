@@ -66,7 +66,7 @@ resource "kubectl_manifest" "spot_node_pool" {
               operator: In
               values: [amd64]
           nodeClassRef:
-            group: karpenter.sh
+            group: karpenter.k8s.aws
             kind: EC2NodeClass
             name: llama-inference
       limits:
@@ -111,7 +111,7 @@ resource "kubectl_manifest" "ondemand_node_pool" {
               operator: In
               values: [amd64]
           nodeClassRef:
-            group: karpenter.sh
+            group: karpenter.k8s.aws
             kind: EC2NodeClass
             name: llama-inference
       limits:
