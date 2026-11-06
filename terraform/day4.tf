@@ -47,7 +47,7 @@ resource "helm_release" "keda" {
 }
 
 locals {
-  prometheus_url = "http://${helm_release.kube_prometheus_stack.name}-kube-prometheus-stack-prometheus.monitoring.svc.cluster.local:9090"
+  prometheus_url = "http://${helm_release.kube_prometheus_stack.name}-prometheus.monitoring.svc.cluster.local:9090"
 }
 
 resource "kubectl_manifest" "keda_scaled_object" {

@@ -80,14 +80,22 @@ GATEWAY_TAG   ?= latest
 GATEWAY_KEY   ?= demo-key-1
 GATEWAY_HOSTNAME ?=
 
-up-gateway: kubeconfig ## Deploy the gateway behind the ALB (hashed key from $(GATEWAY_KEY))
+GW_BASE ?= #[public ALB URL]
+API_KEY ?= $(GATEWAY_KEY)
+PER_TEST_SEC ?= 60
+MAX_TOKENS ?= 64
+DEMO_HTTP := --set 'ingress.annotations.alb\.ingress\.kubernetes\.io/listen-ports=[{"HTTP":80}]' \
+	--set 'ingress.annotations.alb\.ingress\.kubernetes\.io/ssl-redirect'=null
+
+up-gateway: kubeconfig ## Deploy the gateway behind the ALB (hashed key from $(GATEWAY_KEY)); HTTP-only until an ACM cert is wired
 	@KEY_HASH=$$(printf '%s' '$(GATEWAY_KEY)' | shasum -a 256 | cut -d' ' -f1); \
 	helm upgrade --install gateway charts/gateway \
 		--namespace $(GATENAMESPACE) --create-namespace \
 		--set image.repository=$(GATEWAY_REPO) \
 		--set image.tag=$(GATEWAY_TAG) \
-		--set keys="main:$$KEY_HASH" \
+		--set "keys[0]=main:$${KEY_HASH}" \
 		--set ingress.hostname=$(GATEWAY_HOSTNAME) \
+		$(DEMO_HTTP) \
 		--set serviceMonitor.enabled=true \
 		--wait --timeout 10m
 

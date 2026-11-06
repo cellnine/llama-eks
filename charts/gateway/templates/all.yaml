@@ -65,7 +65,7 @@ spec:
                 name: {{ .Chart.Name }}-config
           env:
             - name: API_KEYS_PATH
-              value: /etc/gateway/keys
+              value: /etc/gateway/keys/keys
           volumeMounts:
             - name: apikeys
               mountPath: /etc/gateway/keys
