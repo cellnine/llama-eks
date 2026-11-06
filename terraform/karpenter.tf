@@ -140,6 +140,8 @@ resource "kubectl_manifest" "ec2_node_class" {
       securityGroupSelectorTerms:
         - tags:
             "karpenter.sh/discovery": ${module.eks.cluster_name}
+      amiSelectorTerms:
+        - alias: AL2023@latest
       tags:
         Project: ${var.project}
       expireAfter: 14d
