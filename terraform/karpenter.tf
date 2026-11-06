@@ -70,7 +70,7 @@ resource "kubectl_manifest" "spot_node_pool" {
             kind: EC2NodeClass
             name: llama-inference
       limits:
-        cpu: 8
+        cpu: 16
       weight: 20
       disruption:
         consolidationPolicy: WhenEmptyOrUnderutilized
@@ -115,7 +115,7 @@ resource "kubectl_manifest" "ondemand_node_pool" {
             kind: EC2NodeClass
             name: llama-inference
       limits:
-        cpu: 8
+        cpu: 16
       weight: 10
       disruption:
         consolidationPolicy: WhenEmpty
